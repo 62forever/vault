@@ -1,0 +1,47 @@
+name: Build Vault from Main
+
+# 触发条件：当代码被推送到 main 分支时运行[citation:1]
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    # 在最新的Ubuntu系统上运行
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出仓库代码[citation:1]
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置Go语言环境（Vault main分支通常需要高版本Go，例如1.25）
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25' # 请根据 Vault 仓库 go.mod 中的要求调整版本
+
+      # 3. 安装必要的编译工具（包括之前缺失的 enumer）
+      - name: Install Build Tools
+        run: |
+          go install github.com/dmarkham/enumer@latest
+          # 将GO工具目录加入PATH，确保enumer可用
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      # 4. 准备并执行编译（这是核心步骤）
+      - name: Build Vault Binary
+        run: |
+          # 运行bootstrap，准备环境
+          make bootstrap
+          # 编译开发版本二进制文件，这会包含huaweicloudkms等所有功能
+          make dev
+          # 确认编译成功，查看版本（可选）
+          ./bin/vault version
+
+      # 5. 上传编译产物，供后续下载使用[citation:6]
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-binary
+          path: ./bin/vault # 上传编译好的二进制文件
+          retention-days: 7 # 产物保留7天
